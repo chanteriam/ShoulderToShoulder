@@ -6,11 +6,11 @@ import jaxlib
 from tqdm import tqdm
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from shoulder.ml.ml.dataset import Dataset
+from .dataset import Dataset
 import pathlib
 
 from jax import value_and_grad, jit
-from shoulder.ml.ml.model import foward_deep_fm, foward_fm, foward_mlp, foward_embedding
+from .model import foward_deep_fm, foward_fm, foward_mlp, foward_embedding
 
 LR = 0.0001
 WEIGHTS = None

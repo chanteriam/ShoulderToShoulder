@@ -39,21 +39,22 @@ export class ProfileService {
    * @returns An Observable of the user's profile data.
    */
   getProfile() {
-    let user = sessionStorage.getItem('user');
+    const user = sessionStorage.getItem('user');
     if (user) {
-      let userObj = JSON.parse(user);
-      let userId = userObj.id;
+      const userObj = JSON.parse(user);
+      const userId = userObj.id;
+  
       this.http.get<any>(`${this.endpoint}?user_id=${userId}`).subscribe(
         response => {
           if (response.results.length > 0) {
-            let profile = response.results[0];
-            this.getProfilePictureUrl(profile.id);
+            const profile = response.results[0];
+            this.profilePicture.next(profile.profile_picture); // it's now a full URL
           }
         },
         error => {
-          console.error('Error fetching profile picture:', error);
+          console.error('Error fetching profile:', error);
         }
-      )
+      );
     }
   }
 

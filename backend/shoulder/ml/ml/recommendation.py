@@ -2,9 +2,9 @@ import pickle
 import jaxlib
 import requests
 import jax.numpy as jnp
-from shoulder.ml.ml.dataset import Dataset
-from shoulder.ml.ml.model import init_deep_fm
-from shoulder.ml.ml.train import train, predict
+from .dataset import Dataset
+from .model import init_deep_fm
+from .train import train, predict
 import os, pathlib
 from copy import deepcopy
 
@@ -31,9 +31,9 @@ def preprocess(raw_data: list, predict=False) -> jaxlib.xla_extension.ArrayImpl:
         user_id = d["user_id"]
         del d["user_id"]
         del d["id"]
-        if d.get('scenario_id'):
+        if d.get("scenario_id"):
             del d["scenario_id"]
-        if d.get('event_id'):
+        if d.get("event_id"):
             del d["event_id"]
 
         if not predict:
@@ -50,8 +50,8 @@ def preprocess(raw_data: list, predict=False) -> jaxlib.xla_extension.ArrayImpl:
                 user_event_list.append(high)
             else:
                 user_event_list.append(low)
-            
-            # Ensures unique integers for every response in very field, basically creating 
+
+            # Ensures unique integers for every response in very field, basically creating
             # a vocabulary for the embedding layer
             low += 2
             high += 2
@@ -69,9 +69,15 @@ def preprocess(raw_data: list, predict=False) -> jaxlib.xla_extension.ArrayImpl:
         return x
 
 
-def pretrain(raw_data: requests.models.Response, num_factors: int=5, batch_size=32, 
-             num_epochs: int=10, seed=1994, seeds=(8, 6, 7), 
-             path: str=PARAMETERS_PATH) -> tuple[list]:
+def pretrain(
+    raw_data: requests.models.Response,
+    num_factors: int = 5,
+    batch_size=32,
+    num_epochs: int = 10,
+    seed=1994,
+    seeds=(8, 6, 7),
+    path: str = PARAMETERS_PATH,
+) -> tuple[list]:
     """
     Pretrain a DeepFM
 
@@ -93,12 +99,17 @@ def pretrain(raw_data: requests.models.Response, num_factors: int=5, batch_size=
     data = Dataset(full_x, full_y, batch_size, seed)
     params = init_deep_fm(int(jnp.max(full_x)), full_x.shape[1], num_factors, seeds)
     epochs, loss_list, acc_list, params = train(params, data, num_epochs, path)
-    
+
     return epochs, loss_list, acc_list
 
 
-def finetune(raw_data: requests.models.Response,  batch_size=32, num_epochs: int=5, 
-             seed=1999, path: str=PARAMETERS_PATH) -> tuple[list]:
+def finetune(
+    raw_data: requests.models.Response,
+    batch_size=32,
+    num_epochs: int = 5,
+    seed=1999,
+    path: str = PARAMETERS_PATH,
+) -> tuple[list]:
     """
     Finetune a DeepFM
 
@@ -117,8 +128,8 @@ def finetune(raw_data: requests.models.Response,  batch_size=32, num_epochs: int
     full_x, full_y = preprocess(raw_data)
     data = Dataset(full_x, full_y, batch_size, seed)
 
-    with open(WEIGHTS_PATH, 'rb') as file:
-            params = pickle.load(file)
+    with open(WEIGHTS_PATH, "rb") as file:
+        params = pickle.load(file)
 
     epochs, loss_list, acc_list, params = train(params, data, num_epochs, path=path)
 
@@ -126,16 +137,16 @@ def finetune(raw_data: requests.models.Response,  batch_size=32, num_epochs: int
 
 
 def recommend(raw_data: requests.models.Response) -> jaxlib.xla_extension.ArrayImpl:
-     """
-     Get recommendations for users and events.
+    """
+    Get recommendations for users and events.
 
-     Parameters:
-     -----------
-        raw_data (list): user and event data from the event suggestions table.
+    Parameters:
+    -----------
+       raw_data (list): user and event data from the event suggestions table.
 
-        Returns:
-        --------
-            A jax NumPy array of predicted probabilities of attending events
-     """
-     full_x = preprocess(raw_data, predict=True)
-     return predict(full_x)
+       Returns:
+       --------
+           A jax NumPy array of predicted probabilities of attending events
+    """
+    full_x = preprocess(raw_data, predict=True)
+    return predict(full_x)

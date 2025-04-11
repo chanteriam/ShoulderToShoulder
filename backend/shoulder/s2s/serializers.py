@@ -60,6 +60,12 @@ class ProfileSerializer(ModelSerializer):
         model = Profile
         fields = "__all__"
 
+    def get_profile_picture(self, obj):
+        request = self.context.get('request')
+        if obj.profile_picture and hasattr(obj.profile_picture, 'url'):
+            return request.build_absolute_uri(obj.profile_picture.url)
+        return None
+
 class UserSerializer(ModelSerializer):
     class Meta:
         model = User

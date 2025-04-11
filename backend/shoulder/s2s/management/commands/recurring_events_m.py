@@ -71,7 +71,7 @@ class Command(BaseCommand):
             # add events to the database
             for event in events:
                 viewset.create_event(event)
-                time.sleep(1)  # to avoid exceeding the rate limit
+                time.sleep(1.5)  # to avoid exceeding the rate limit
 
             self.stdout.write(self.style.SUCCESS("Events added successfully"))
             self.stdout.write(self.style.SUCCESS(f"Events: {events}"))

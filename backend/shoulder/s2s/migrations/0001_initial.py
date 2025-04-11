@@ -581,7 +581,7 @@ class Migration(migrations.Migration):
                 (
                     "profile_picture",
                     models.URLField(
-                        default="https://s2s-profile-photos.s3.amazonaws.com/default_profile.jpeg"
+                        default="https://s2s-profile-photos.s3.amazonaws.com/default_profile.jpg"
                     ),
                 ),
                 ("last_email_sent", models.DateTimeField(blank=True, null=True)),

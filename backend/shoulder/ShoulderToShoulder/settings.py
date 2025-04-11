@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 import environ
 from datetime import timedelta
+import os
 
 env = environ.Env()
 environ.Env.read_env()
@@ -30,7 +31,12 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "admin.shouldertoshoulder.me", "shouldertoshoulder.me"]
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "admin.shouldertoshoulder.me",
+    "shouldertoshoulder.me",
+]
 
 
 # Application definition
@@ -111,13 +117,17 @@ WSGI_APPLICATION = "ShoulderToShoulder.wsgi.application"
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASES = {
+    # "default": {
+    #     "ENGINE": "django.db.backends.postgresql_psycopg2",
+    #     "NAME": env("DB_NAME"),
+    #     "USER": env("DB_USER"),
+    #     "PASSWORD": env("DB_PASSWORD"),
+    #     "HOST": env("DB_HOST"),
+    #     "PORT": env("DB_PORT"),
+    # }
     "default": {
-        "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": env("DB_NAME"),
-        "USER": env("DB_USER"),
-        "PASSWORD": env("DB_PASSWORD"),
-        "HOST": env("DB_HOST"),
-        "PORT": env("DB_PORT"),
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": os.path.join(BASE_DIR, "s2s.sqlite"),
     }
 }
 
@@ -193,12 +203,13 @@ AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
 
 # Use S3 storage for media files
 DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
-MEDIA_URL = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/"
+# MEDIA_URL = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 # Default profile picture path
-DEFAULT_PROFILE_IMAGE_PATH = MEDIA_URL + 'default_profile.jpeg'
+DEFAULT_PROFILE_IMAGE_PATH = MEDIA_URL + "default_profile.jpg"
 
-EMAIL_BACKEND = 'django_ses.SESBackend'
-AWS_REGION_NAME = env("AWS_S3_REGION_NAME") 
-S2S_FROM_EMAIL = 'shouldertoshoulder.contact@gmail.com'
-
+EMAIL_BACKEND = "django_ses.SESBackend"
+AWS_REGION_NAME = env("AWS_S3_REGION_NAME")
+S2S_FROM_EMAIL = "shouldertoshoulder.contact@gmail.com"

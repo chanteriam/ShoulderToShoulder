@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.contrib.auth.models import Group
 from rest_framework.response import Response
 from django.http import HttpResponse
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, status
 from s2s.permissions import HasAppToken
 from django.test.client import RequestFactory
 from rest_framework.test import APIRequestFactory
@@ -32,9 +32,11 @@ from .db_models import *
 
 from ml.ml.recommendation import recommend, finetune, pretrain
 
+
 # functions
 def index(request):
     return HttpResponse("Hello, world. You're at the ShoulderToShoulder index.")
+
 
 # viewsets
 class HobbyTypeViewSet(viewsets.ModelViewSet):
@@ -44,16 +46,17 @@ class HobbyTypeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
-        types = self.request.GET.getlist('type')
-        ids = self.request.GET.getlist('id')
+        types = self.request.GET.getlist("type")
+        ids = self.request.GET.getlist("id")
 
         if types:
             queryset = queryset.filter(type__in=types)
-        
+
         if ids:
             queryset = queryset.filter(id__in=ids)
 
         return queryset
+
 
 class HobbyViewSet(viewsets.ModelViewSet):
     queryset = Hobby.objects.all()
@@ -62,16 +65,17 @@ class HobbyViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
-        names = self.request.GET.getlist('name')
-        ids = self.request.GET.getlist('id')
+        names = self.request.GET.getlist("name")
+        ids = self.request.GET.getlist("id")
 
         if names:
             queryset = queryset.filter(name__in=names)
-        
+
         if ids:
             queryset = queryset.filter(id__in=ids)
 
         return queryset
+
 
 class GroupViewSet(viewsets.ModelViewSet):
     queryset = Group.objects.all()
@@ -80,7 +84,7 @@ class GroupViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
-        user_id = self.request.query_params.get('user_id')
+        user_id = self.request.query_params.get("user_id")
 
         if user_id:
             user = User.objects.get(id=user_id)
@@ -90,9 +94,9 @@ class GroupViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         # extract user emails from request data and grab user IDs
-        user_emails = request.data.pop('members')
+        user_emails = request.data.pop("members")
         users = User.objects.filter(email__in=user_emails)
-        request.data['members'] = users
+        request.data["members"] = users
 
         # create group
         serializer = GroupSerializer(data=request.data)
@@ -101,6 +105,7 @@ class GroupViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
 
+
 class EventViewSet(viewsets.ModelViewSet):
     queryset = Event.objects.all()
     serializer_class = EventSerializer
@@ -108,22 +113,39 @@ class EventViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
-        user_id = self.request.query_params.get('user_id')
-        event_id = self.request.GET.getlist('event_id')
+        user_id = self.request.query_params.get("user_id")
+        event_id = self.request.GET.getlist("event_id")
 
         if user_id:
             user = User.objects.get(id=user_id)
             queryset = queryset.filter(created_by=user)
-        
+
         if event_id:
             queryset = queryset.filter(id__in=event_id)
-        
+
         return queryset
 
     def create(self, request, *args, **kwargs):
-        required_fields = ['title', 'hobby_type', 'datetime', 'duration_h', 'address1', 'max_attendees', 'city', 'state', 'zipcode', 'price', 'description']
+        required_fields = [
+            "title",
+            "hobby_type",
+            "datetime",
+            "duration_h",
+            "address1",
+            "max_attendees",
+            "city",
+            "state",
+            "zipcode",
+            "price",
+            "description",
+        ]
         if not all([field in request.data for field in required_fields]):
-            return Response({"error": f"Missing required fields: one of {", ".join(required_fields[:-1])}"}, status=400)
+            return Response(
+                {
+                    "error": f"Missing required fields: one of {", ".join(required_fields[:-1])}"
+                },
+                status=400,
+            )
 
         # create the event
         response = self.create_event(request.data)
@@ -136,84 +158,83 @@ class EventViewSet(viewsets.ModelViewSet):
         Create an event from the provided data.
         """
         # get the hobby type object
-        hobby_type = HobbyType.objects.get(type=request_data['hobby_type'])
+        hobby_type = HobbyType.objects.get(type=request_data["hobby_type"])
 
         # get the user/created_by
-        if 'created_by' not in request_data:
+        if "created_by" not in request_data:
             user = None
         else:
-            user = User.objects.get(id=request_data['created_by'])
+            user = User.objects.get(id=request_data["created_by"])
 
         # get the latitute and longitude from the address
         full_address = f"{request_data['address1']} {request_data['city']}, {request_data['state']}"
         addr_resp = geocode(full_address)
         if not addr_resp:
             return {"error": "Invalid address"}
-        latitude, longitude = addr_resp['coords']
-        latitude = '%.10f'%(latitude)
-        longitude = '%.11f'%(longitude)
+        latitude, longitude = addr_resp["coords"]
+        latitude = "%.10f" % (latitude)
+        longitude = "%.11f" % (longitude)
 
         # create the event
         data = {
-            'title': request_data['title'],
-            'description': request_data.get('description', None),
-            'hobby_type': hobby_type.id,
-            'created_by': user.id,
-            'datetime': request_data['datetime'],
-            'duration_h': request_data['duration_h'],
-            'address1': request_data['address1'],
-            'address2': request_data.get('address2', None),
-            'city': request_data['city'],
-            'state': request_data['state'],
-            'latitude': latitude,
-            'longitude': longitude,
-            'max_attendees': request_data['max_attendees'],
-            'zipcode': request_data['zipcode'],
-            'price': request_data['price']
+            "title": request_data["title"],
+            "description": request_data.get("description", None),
+            "hobby_type": hobby_type.id,
+            "created_by": user.id,
+            "datetime": request_data["datetime"],
+            "duration_h": request_data["duration_h"],
+            "address1": request_data["address1"],
+            "address2": request_data.get("address2", None),
+            "city": request_data["city"],
+            "state": request_data["state"],
+            "latitude": latitude,
+            "longitude": longitude,
+            "max_attendees": request_data["max_attendees"],
+            "zipcode": request_data["zipcode"],
+            "price": request_data["price"],
         }
         serializer = self.serializer_class(data=data)
         if serializer.is_valid():
             serializer.save()
 
             # add user to event if applicable
-            print("DATA: ", request_data)
-            if request_data.get('add_user', None):
-                event = Event.objects.get(id=serializer.data['id'])
-                user_event = UserEvents(user_id=user, event_id=event, rsvp='Yes', attended=False)
+            if request_data.get("add_user", None):
+                event = Event.objects.get(id=serializer.data["id"])
+                user_event = UserEvents(
+                    user_id=user, event_id=event, rsvp="Yes", attended=False
+                )
                 user_event.save()
-                call_command("send_event_email_m", 
-                             user=user, 
-                             event_info = event)
-        
+                call_command("send_event_email_m", user=user, event_info=event)
+
             # trigger event suggestion panel data
-            self.trigger_panel_event(serializer.data['id'])
+            self.trigger_panel_event(serializer.data["id"])
 
             return serializer.data
         return serializer.errors
 
-    
     def trigger_panel_event(self, event_id):
         # to mimic a request object
         factory = RequestFactory()
-        request = factory.post('/fake-url/', {'event_id': event_id}, format='json')
+        request = factory.post("/fake-url/", {"event_id": event_id}, format="json")
 
         # create event suggestions
-        request.data = {'event_id': event_id}
+        request.data = {"event_id": event_id}
         panel_event = PanelEventViewSet()
         response = panel_event.create(request)
         return response
+
 
 class OnboardingViewSet(viewsets.ModelViewSet):
     queryset = Onboarding.objects.all()
     serializer_class = OnbordingSerializer
     permission_classes = [HasAppToken]
 
-    @action(methods=['post'], detail=False, url_path='update')
+    @action(methods=["post"], detail=False, url_path="update")
     def update_onboarding(self, request, *args, **kwargs):
         # grab the user's row in the onboarding table
         # users are automatically added to the onboarding table when they are created
         try:
-            user = User.objects.get(pk=request.data.get('user_id', None))
+            user = User.objects.get(pk=request.data.get("user_id", None))
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
 
@@ -221,50 +242,51 @@ class OnboardingViewSet(viewsets.ModelViewSet):
         onboarding, created = Onboarding.objects.get_or_create(user_id=user)
 
         # Conduct the geocoding for the user
-        address_fields = ['address_line1', 'city', 'state', 'zip_code']
+        address_fields = ["address_line1", "city", "state", "zip_code"]
         if all(field in request.data for field in address_fields):
             full_address = f"{request.data['address_line1']} {request.data['city']}, {request.data['state']} {request.data['zip_code']}"
             geo_response = geocode(full_address)
             if geo_response:
-                request.data['latitude'] = geo_response['coords'][0]
-                request.data['longitude'] = geo_response['coords'][1]
+                request.data["latitude"] = geo_response["coords"][0]
+                request.data["longitude"] = geo_response["coords"][1]
 
         # Update onboarding data
         serializer = self.get_serializer(onboarding, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            if request.data['onboarded']:
+            if request.data["onboarded"]:
                 # create the panelized preferences and scenarios
                 resp_pref = self.trigger_panel_preferences(user.id)
-                
+
                 if resp_pref.status_code == 201:
                     return Response(serializer.data, status=200)
-                
+
                 return Response({"error": "Failed to get panel data"}, status=400)
             return Response(serializer.data, status=200 if created else 202)
 
         return Response(serializer.errors, status=400)
-    
+
     def trigger_panel_preferences(self, user_id):
         # to mimic a request object
         factory = RequestFactory()
-        request = factory.post('/fake-url/', {'user_id': user_id}, format='json')
+        request = factory.post("/fake-url/", {"user_id": user_id}, format="json")
 
         # create panel preferences
-        request.data = {'user_id': user_id}
+        request.data = {"user_id": user_id}
         panel_preferences = PanelUserPreferencesViewSet()
         response = panel_preferences.create(request)
         return response
 
     def get_queryset(self):
         queryset = self.queryset
-        user_id = self.request.query_params.get('user_id')
+        user_id = self.request.query_params.get("user_id")
 
         if user_id:
             user = User.objects.get(id=user_id)
             queryset = queryset.filter(user_id=user)
 
         return queryset
+
 
 class AvailabilityViewSet(viewsets.ModelViewSet):
     queryset = Availability.objects.all()
@@ -273,57 +295,66 @@ class AvailabilityViewSet(viewsets.ModelViewSet):
 
     def update_availability_obj(self, item, user):
         # validate the item
-        if not all([item.get('user_id'), item.get('day_of_week'), item.get('hour')]):
+        if not all([item.get("user_id"), item.get("day_of_week"), item.get("hour")]):
             return
 
         # get the availability object
-        availability = Availability.objects.get(user_id=user, day_of_week=item['day_of_week'], hour=item['hour'])
+        availability = Availability.objects.get(
+            user_id=user, day_of_week=item["day_of_week"], hour=item["hour"]
+        )
 
         # set the availability
-        availability.available = item['available']
+        availability.available = item["available"]
         return availability
 
-    @action(methods=['post'], detail=False, url_path='bulk_update')
+    @action(methods=["post"], detail=False, url_path="bulk_update")
     def bulk_update(self, request, *args, **kwargs):
         self.serializer_class = BulkAvailabilitySerializer
         data = request.data
 
         # validate the data
         if not isinstance(data, list):
-            return Response({"error": "[Availability Bulk Update] Expected a list of items"}, status=400)
-        
+            return Response(
+                {"error": "[Availability Bulk Update] Expected a list of items"},
+                status=400,
+            )
+
         # extract user data
         if not data[0].get("user_id"):
             return Response({"error": "User ID not provided"}, status=400)
-        
-        user_id = data[0]['user_id']
-        if list(data[0].keys()) == ['user_id']:
+
+        user_id = data[0]["user_id"]
+        if list(data[0].keys()) == ["user_id"]:
             data = data[1:]
-                
+
         # get user
         user = User.objects.get(id=user_id)
         if not user:
             return Response({"error": "User not found"}, status=404)
-        
+
         # Update availability
-        avail_objs = list(map(lambda item: self.update_availability_obj(item, user), data))
+        avail_objs = list(
+            map(lambda item: self.update_availability_obj(item, user), data)
+        )
 
         # bulk update
-        num_updated = Availability.objects.bulk_update(avail_objs, ['available'])
+        num_updated = Availability.objects.bulk_update(avail_objs, ["available"])
 
         return Response({"Number of updated rows": num_updated}, status=200)
 
     def post(self, request, *args, **kwargs):
-        user_id = request.data.get('user_id')
-        day_of_week = request.data.get('day_of_week')
-        hour = request.data.get('hour')
+        user_id = request.data.get("user_id")
+        day_of_week = request.data.get("day_of_week")
+        hour = request.data.get("hour")
 
         # Check if the user_id, day_of_week, and hour are provided
         if not all([user_id, day_of_week, hour]):
             return Response({"error": "Missing required fields"}, status=400)
 
         # Create the availability record
-        availability = Availability(user_id=user_id, day_of_week=day_of_week, hour=hour, available=False)
+        availability = Availability(
+            user_id=user_id, day_of_week=day_of_week, hour=hour, available=False
+        )
         availability.save()
 
         serializer = self.get_serializer(availability)
@@ -331,8 +362,8 @@ class AvailabilityViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
-        email = self.request.query_params.get('email')
-        user_id = self.request.query_params.get('user_id')
+        email = self.request.query_params.get("email")
+        user_id = self.request.query_params.get("user_id")
 
         if email:
             user = User.objects.get(email=email)
@@ -342,6 +373,7 @@ class AvailabilityViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(user_id=user)
 
         return queryset
+
 
 class ChoiceViewSet(viewsets.ModelViewSet):
     queryset = Choice.objects.all()
@@ -353,9 +385,9 @@ class ChoiceViewSet(viewsets.ModelViewSet):
 
         # ability to specify which choice category to return
         # i.e., localhost:8000/choices?category=age_range
-        category_param = request.query_params.get('category')
+        category_param = request.query_params.get("category")
         if category_param:
-            choice = queryset.first() # there is only one choice object
+            choice = queryset.first()  # there is only one choice object
             if choice:
                 categories = choice.categories.get(category_param)
                 if categories:
@@ -376,6 +408,7 @@ class ChoiceViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+
 class ScenariosiewSet(viewsets.ModelViewSet):
     queryset = Scenarios.objects.all()
     serializer_class = ScenariosSerializer
@@ -383,37 +416,37 @@ class ScenariosiewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
-        user_id = self.request.query_params.get('user_id')
+        user_id = self.request.query_params.get("user_id")
 
         if user_id:
             user = User.objects.get(id=user_id)
             queryset = queryset.filter(user_id=user)
 
         return queryset
-    
+
     def bulk_create(self, request, *args, **kwargs):
         # validate data type
         if not isinstance(request.data, list):
             return Response({"error": "Expected a list of items"}, status=400)
-        
+
         # extract user data
         if not request.data[0].get("user_id"):
             return Response({"error": "User ID not provided"}, status=400)
-        
-        user_id = request.data[0]['user_id']
+
+        user_id = request.data[0]["user_id"]
         data = request.data[1:]
 
         # get user
         user = User.objects.get(id=user_id)
         if not user:
             return Response({"error": "User not found"}, status=404)
-        
+
         # add user ID to each item
         for item in data:
-            item['user_id'] = user
+            item["user_id"] = user
 
         # add hobby object
-        hobby_cols = ['hobby1', 'hobby2']
+        hobby_cols = ["hobby1", "hobby2"]
         for item in data:
             for col in hobby_cols:
                 if item.get(col):
@@ -426,18 +459,19 @@ class ScenariosiewSet(viewsets.ModelViewSet):
         # create the panelized scenarios
         self.trigger_panel_scenarios(user_id)
 
-        return Response({"Number of created rows": len(scenario_objs)}, status=201)        
-    
+        return Response({"Number of created rows": len(scenario_objs)}, status=201)
+
     def trigger_panel_scenarios(self, user_id):
         # to mimic a request object
         factory = RequestFactory()
-        request = factory.post('/fake-url/', {'user_id': user_id}, format='json')
+        request = factory.post("/fake-url/", {"user_id": user_id}, format="json")
 
         # create event suggestions
-        request.data = {'user_id': user_id}
+        request.data = {"user_id": user_id}
         panel_scenario = PanelScenarioViewSet()
         response = panel_scenario.create(request)
         return response
+
 
 class ProfilesViewSet(viewsets.ModelViewSet):
     queryset = Profile.objects.all()
@@ -445,110 +479,71 @@ class ProfilesViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(
+            data=request.data, context={"request": request}
+        )
         if serializer.is_valid():
-            # Save the Profile which includes saving the image to S3
-            serializer.save()
-            return Response(serializer.data, status=201)
-        else:
-            return Response(serializer.errors, status=400)
-        
-    def generate_presigned_url(self, bucket_name, object_key, expiration=3600):
-        """Generate a presigned URL for an S3 object."""
-        s3_client = boto3.client('s3',
-                                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                                region_name=settings.AWS_S3_REGION_NAME)
-        try:
-            url = s3_client.generate_presigned_url('get_object',
-                                                Params={'Bucket': bucket_name,
-                                                        'Key': object_key},
-                                                ExpiresIn=expiration)
-        except Exception as e:
-            print(f"Error generating presigned URL: {e}")
-            return None
-        return url
-    
-    @action(detail=True, methods=['get'], url_path='get-presigned-url')
-    def get_presigned_url(self, request, pk=None):
-        try:
-            profile = Profile.objects.get(pk=pk, user_id=request.user.id)  # Ensuring access control
-        except Profile.DoesNotExist:
-            return Response({"error": "Profile not found"}, status=404)
+            profile = serializer.save()
+            return Response(
+                self.serializer_class(profile, context={"request": request}).data,
+                status=201,
+            )
+        return Response(serializer.errors, status=400)
 
-        object_key = str(profile.profile_picture).split("/")[-1] 
-        presigned_url = self.generate_presigned_url(settings.AWS_STORAGE_BUCKET_NAME, object_key, 3600)
-
-        if presigned_url:
-            return Response({"profile_picture": presigned_url}, status=200)
-        else:
-            return Response({"error": "Unable to generate URL"}, status=403)
-        
     def get_queryset(self):
-        queryset = self.queryset
-        user_id = self.request.query_params.get('user_id')
-
+        user_id = self.request.query_params.get("user_id")
         if user_id:
-            queryset = queryset.filter(user_id=user_id)
+            return self.queryset.filter(user_id=user_id)
+        return self.queryset
 
-        return queryset
-    
-    @action(methods=['post'], detail=False, url_path='upload')
+    @action(methods=["post"], detail=False, url_path="upload")
     def upload(self, request, *args, **kwargs):
-        # Retrieve user_id from request.POST (not request.data when using FormData)
-        user_id = request.POST.get('user_id')
+        user_id = request.POST.get("user_id")
         if not user_id:
             return Response({"error": "User ID not provided"}, status=400)
-        
+
         try:
             profile = Profile.objects.get(user_id=user_id)
         except Profile.DoesNotExist:
             return Response({"error": "Profile not found"}, status=404)
 
-        # Retrieve the image from request.FILES (not request.data)
-        image = request.FILES.get('image')
+        image = request.FILES.get("image")
         if not image:
             return Response({"error": "Image not provided"}, status=400)
 
-        # Setup the S3 client
-        s3 = boto3.client('s3',
-                        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                        region_name=settings.AWS_S3_REGION_NAME)
-        bucket = settings.AWS_STORAGE_BUCKET_NAME  # Directly use settings to avoid errors
-        key = f"user_{user_id}.png"
+        profile.profile_picture.save(f"user_{user_id}.png", image)
+        profile.save()
 
-        # Upload the file to S3
-        try:
-            s3.upload_fileobj(image, bucket, key)
-            
-            # Update the profile picture URL (if storing the URL)
-            profile.profile_picture = key # "https://" + bucket + ".s3." + settings.AWS_S3_REGION_NAME + ".amazonaws.com/" + key
-            profile.save()
-            profile_picture = self.generate_presigned_url(bucket, key)
-            
-            return Response({"detail": "Image uploaded", "profile_picture": profile_picture}, status=200)
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
+        return Response(
+            {
+                "detail": "Image uploaded",
+                "profile_picture": profile.profile_picture.url,
+            },
+            status=200,
+        )
+
 
 class ZipCodeViewSet(viewsets.ModelViewSet):
     endpoint = "https://api.zipcodestack.com/v1/search?country=us"
-    api_key = environ.Env().str('ZIPCODE_API_KEY')
+    api_key = environ.Env().str("ZIPCODE_API_KEY")
 
     def list(self, request, *args, **kwargs):
-        zip_code = request.query_params.get('zip_code')
+        zip_code = request.query_params.get("zip_code")
         if zip_code:
-            response = requests.get(f"{self.endpoint}&codes={zip_code}&apikey={self.api_key}")
+            response = requests.get(
+                f"{self.endpoint}&codes={zip_code}&apikey={self.api_key}"
+            )
             return Response(response.json())
         return Response({"error": "Zip code not provided"}, status=400)
+
 
 class CreateUserViewSet(viewsets.ModelViewSet):
     permission_classes = [HasAppToken]
 
     def create(self, request):
-        request.data['username'] = request.data['email']
+        request.data["username"] = request.data["email"]
         # check if user already exists
-        user = User.objects.filter(email=request.data['email'])
+        user = User.objects.filter(email=request.data["email"])
         if user:
             return Response({"error": "User already exists"}, status=400)
 
@@ -572,18 +567,21 @@ class CreateUserViewSet(viewsets.ModelViewSet):
             # for each option in the calendar table, create a row in the
             # availability table and set the default availability to False
             for day, hour in calendar:
-                availability = Availability(user_id=user, day_of_week=day, hour=hour, available=False)
+                availability = Availability(
+                    user_id=user, day_of_week=day, hour=hour, available=False
+                )
                 availability.save()
 
             # Return user information and tokens
             data = {
-                'user': serializer.data,
-                'access_token': access_token,
-                'refresh_token': refresh_token
+                "user": serializer.data,
+                "access_token": access_token,
+                "refresh_token": refresh_token,
             }
 
             return Response(data, status=201)
         return Response(serializer.errors, status=400)
+
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -592,7 +590,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
-        email = self.request.query_params.get('email')
+        email = self.request.query_params.get("email")
 
         if email:
             queryset = queryset.filter(email=email)
@@ -615,14 +613,9 @@ class UserViewSet(viewsets.ModelViewSet):
         # delete the user's profile picture from S3
         try:
             profile = Profile.objects.get(user_id=user.id)
-            if profile.profile_picture != "https://s2s-profile-photos.s3.amazonaws.com/default_profile.jpeg":
-                object_key = str(profile.profile_picture).split("/")[-1]
-                s3 = boto3.client('s3',
-                                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                                region_name=settings.AWS_S3_REGION_NAME)
-                s3.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=object_key)
-            profile.profile_picture = "https://s2s-profile-photos.s3.amazonaws.com/default_profile.jpeg"
+            if profile.profile_picture != settings.DEFAULT_PROFILE_IMAGE_PATH:
+                os.remove(profile.profile_picture.path)
+            profile.profile_picture = settings.DEFAULT_PROFILE_IMAGE_PATH
             profile.save()
             return Response({"detail": "Profile picture deleted"}, status=200)
         except Profile.DoesNotExist:
@@ -633,40 +626,41 @@ class UserViewSet(viewsets.ModelViewSet):
         self.delete_profile_picture(request, *args, **kwargs)
         user.delete()
         return Response({"detail": "User deleted"}, status=204)
-    
-    @action(methods=['patch'], detail=False, url_path='change_password')
+
+    @action(methods=["patch"], detail=False, url_path="change_password")
     def change_password(self, request, *args, **kwargs):
         # confirm all the correct data is provided
-        keys = ['email', 'current_password', 'password', 'confirm_password']
+        keys = ["email", "current_password", "password", "confirm_password"]
         if not all([key in request.data for key in keys]):
             return Response({"error": f"Missing required fields: {keys}"}, status=400)
 
         # find the user
         try:
-            user = User.objects.get(email=request.data.get('email', None))
+            user = User.objects.get(email=request.data.get("email", None))
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
 
         # confirm the password they provided is correct
-        if not user.check_password(request.data.get('current_password')):
+        if not user.check_password(request.data.get("current_password")):
             return Response({"error": "Invalid password"}, status=400)
 
         # confirm the password equals the confirm password
-        if request.data.get('password') != request.data.get('confirm_password'):
+        if request.data.get("password") != request.data.get("confirm_password"):
             return Response({"error": "Passwords do not match"}, status=400)
 
         # change the password
-        user.set_password(request.data.get('password'))
+        user.set_password(request.data.get("password"))
         user.save()
         return Response({"detail": "Password changed"}, status=200)
+
 
 class LoginViewSet(viewsets.ViewSet):
     permission_classes = [HasAppToken]
 
     def login(self, request):
-        if request.method == 'POST':
-            username = request.data.get('username')
-            password = request.data.get('password')
+        if request.method == "POST":
+            username = request.data.get("username")
+            password = request.data.get("password")
 
             user = authenticate(username=username, password=password)
 
@@ -675,21 +669,24 @@ class LoginViewSet(viewsets.ViewSet):
                 refresh = RefreshToken.for_user(user)
                 access_token = str(refresh.access_token)
                 refresh_token = str(refresh)
-                return Response({
-                    'user': {
-                        'id': user.id,
-                        'first_name': user.first_name,
-                        'last_name': user.last_name,
-                        'username': user.username,
-                        'email': user.email
-                    },
-                    'access_token': access_token,
-                    'refresh_token': refresh_token
-                })
+                return Response(
+                    {
+                        "user": {
+                            "id": user.id,
+                            "first_name": user.first_name,
+                            "last_name": user.last_name,
+                            "username": user.username,
+                            "email": user.email,
+                        },
+                        "access_token": access_token,
+                        "refresh_token": refresh_token,
+                    }
+                )
             else:
-                return Response({'error': 'Invalid credentials'}, status=401)
+                return Response({"error": "Invalid credentials"}, status=401)
         else:
-            return Response({'error': 'Method not allowed'}, status=405)
+            return Response({"error": "Method not allowed"}, status=405)
+
 
 class ApplicationTokenViewSet(viewsets.ModelViewSet):
     queryset = ApplicationToken.objects.all()
@@ -705,15 +702,16 @@ class ApplicationTokenViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
-        name = self.request.query_params.get('name')
-        token = self.request.query_params.get('token')
+        name = self.request.query_params.get("name")
+        token = self.request.query_params.get("token")
 
         if name:
             queryset = queryset.filter(name=name)
         elif token:
             queryset = queryset.filter(token=token)
- 
+
         return queryset
+
 
 class UserEventsViewSet(viewsets.ModelViewSet):
     queryset = UserEvents.objects.all()
@@ -722,7 +720,7 @@ class UserEventsViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
-        user_id = self.request.query_params.get('user_id')
+        user_id = self.request.query_params.get("user_id")
 
         if user_id:
             user = User.objects.get(id=user_id)
@@ -731,7 +729,7 @@ class UserEventsViewSet(viewsets.ModelViewSet):
         response = {"past_events": [], "upcoming_events": []}
         event_serializer_class = EventSerializer
         for user_event in queryset:
-            if user_event.rsvp == 'No':
+            if user_event.rsvp == "No":
                 continue
             event = user_event.event_id
             serialized_event = event_serializer_class(event).data
@@ -741,13 +739,13 @@ class UserEventsViewSet(viewsets.ModelViewSet):
                 response["upcoming_events"].append(serialized_event)
 
         return queryset
-    
-    @action(detail=False, methods=['get'], url_path='upcoming_past_events')
+
+    @action(detail=False, methods=["get"], url_path="upcoming_past_events")
     def get_upcoming_past_events(self, request, *args, **kwargs):
-        user_id = self.request.query_params.get('user_id')
+        user_id = self.request.query_params.get("user_id")
         if not user_id:
             return Response({"error": "User ID not provided"}, status=400)
-        
+
         # get the user
         user = User.objects.get(id=user_id)
 
@@ -755,31 +753,34 @@ class UserEventsViewSet(viewsets.ModelViewSet):
         user_events = UserEvents.objects.filter(user_id=user)
 
         # get the past and upcoming events
-        response = {"past_events": {"count": 0, "events": []}, "upcoming_events": {"count": 0, "events": []}}
+        response = {
+            "past_events": {"count": 0, "events": []},
+            "upcoming_events": {"count": 0, "events": []},
+        }
         event_serializer_class = EventSerializer
         for user_event in user_events:
-            if user_event.rsvp == 'No':
+            if user_event.rsvp == "No":
                 continue
             event = user_event.event_id
             serialized_event = event_serializer_class(event).data
-            serialized_event['rating'] = user_event.user_rating
-            serialized_event['attended'] = user_event.attended
+            serialized_event["rating"] = user_event.user_rating
+            serialized_event["attended"] = user_event.attended
             if event.datetime < timezone.now():
-                response["past_events"]['events'].append(serialized_event)
-                response["past_events"]['count'] += 1
+                response["past_events"]["events"].append(serialized_event)
+                response["past_events"]["count"] += 1
             else:
-                response["upcoming_events"]['events'].append(serialized_event)
-                response["upcoming_events"]['count'] += 1
-            
+                response["upcoming_events"]["events"].append(serialized_event)
+                response["upcoming_events"]["count"] += 1
+
         return Response(response, status=200)
-    
-    @action(detail=False, methods=['post'], url_path='review_event')
+
+    @action(detail=False, methods=["post"], url_path="review_event")
     def review_event(self, request, *args, **kwargs):
         # Ensure the user_id, event_id, and attendance are provided in the request
-        user_id = request.data.get('user_id')
-        event_id = request.data.get('event_id')
-        attended = request.data.get('attended')
-        rating = request.data.get('user_rating')
+        user_id = request.data.get("user_id")
+        event_id = request.data.get("event_id")
+        attended = request.data.get("attended")
+        rating = request.data.get("user_rating")
         if not all([user_id, event_id]):
             return Response({"error": "User ID or Event ID not provided"}, status=400)
 
@@ -803,14 +804,16 @@ class UserEventsViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(user_event)
         return Response(serializer.data, status=200)
-    
+
     def create(self, request, *args, **kwargs):
         # Ensure the user_id and event_id are provided in the request
-        user_id = request.data.get('user_id')
-        event_id = request.data.get('event_id')
-        rsvp = request.data.get('rsvp', 'No')
+        user_id = request.data.get("user_id")
+        event_id = request.data.get("event_id")
+        rsvp = request.data.get("rsvp", "No")
         if not all([user_id, event_id]):
-            return Response({"error": "User ID and/or Event ID not provided"}, status=400)
+            return Response(
+                {"error": "User ID and/or Event ID not provided"}, status=400
+            )
 
         # Attempt to fetch the user and event objects
         try:
@@ -820,12 +823,10 @@ class UserEventsViewSet(viewsets.ModelViewSet):
             return Response({"error": "User not found"}, status=404)
         except Event.DoesNotExist:
             return Response({"error": "Event not found"}, status=404)
-        
+
         # Notify user of event via email
-        if rsvp == 'Yes':
-            call_command("send_event_email_m", 
-                             user=user, 
-                             event_info = event)
+        if rsvp == "Yes":
+            call_command("send_event_email_m", user=user, event_info=event)
 
         # Create the user event object
         user_event = UserEvents(user_id=user, event_id=event, rsvp=rsvp, attended=False)
@@ -833,7 +834,8 @@ class UserEventsViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(user_event)
         return Response(serializer.data, status=201)
-    
+
+
 class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
     queryset = PanelUserPreferences.objects.all()
     serializer_class = PanelUserPreferencesSerializer
@@ -841,7 +843,7 @@ class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
-        user_id = self.request.query_params.get('user_id')
+        user_id = self.request.query_params.get("user_id")
 
         if user_id:
             user = User.objects.get(id=user_id)
@@ -852,7 +854,7 @@ class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         # Ensure the user_id is provided in the request
-        user_id = request.data.get('user_id')
+        user_id = request.data.get("user_id")
         if not user_id:
             return Response({"error": "User ID not provided"}, status=400)
 
@@ -860,14 +862,16 @@ class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
         try:
             onboarding_data = Onboarding.objects.get(user_id=user_id)
         except ObjectDoesNotExist:
-            return Response({"error": "Onboarding data not found for this user"}, status=404)
+            return Response(
+                {"error": "Onboarding data not found for this user"}, status=404
+            )
 
         # Attempt to retrieve the user object
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
-        
+
         # delete existing panel preferences row if it exists
         try:
             existing_panel_preferences = PanelUserPreferences.objects.get(user_id=user)
@@ -877,10 +881,17 @@ class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
 
         # Prepare panel preferences data based on the user and their onboarding data
         try:
-            panel_preferences_data = self.prepare_panel_preferences_data(user, onboarding_data)
-            panel_preferences = PanelUserPreferences.objects.create(**panel_preferences_data)
+            panel_preferences_data = self.prepare_panel_preferences_data(
+                user, onboarding_data
+            )
+            panel_preferences = PanelUserPreferences.objects.create(
+                **panel_preferences_data
+            )
         except Exception as e:
-            return Response({"error": f"Failed to create panel user preferences: {str(e)}"}, status=400)
+            return Response(
+                {"error": f"Failed to create panel user preferences: {str(e)}"},
+                status=400,
+            )
 
         # Return a success response
         return Response({"detail": "Successfully updated"}, status=201)
@@ -897,16 +908,28 @@ class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
         Returns: event_suggestions_data (dict): dictionary containing user's
         onboarding information as necessary for the PanelUserPreferences row
         """
-        event_suggestions_data = {'user_id': user}
-        event_suggestions_data.update(self.parse_num_participants_pref(onboarding_data.num_participants))
+        event_suggestions_data = {"user_id": user}
+        event_suggestions_data.update(
+            self.parse_num_participants_pref(onboarding_data.num_participants)
+        )
 
-        event_suggestions_data.update(self.parse_distance_preferences(onboarding_data.distance))
+        event_suggestions_data.update(
+            self.parse_distance_preferences(onboarding_data.distance)
+        )
 
-        event_suggestions_data.update(self.parse_similarity_preferences(onboarding_data.similarity_to_group))
+        event_suggestions_data.update(
+            self.parse_similarity_preferences(onboarding_data.similarity_to_group)
+        )
 
-        event_suggestions_data.update(self.parse_similarity_metrics(onboarding_data.similarity_metrics))
+        event_suggestions_data.update(
+            self.parse_similarity_metrics(onboarding_data.similarity_metrics)
+        )
 
-        event_suggestions_data.update(self.parse_hobby_type_onboarding(onboarding_data.most_interested_hobby_types.all()))
+        event_suggestions_data.update(
+            self.parse_hobby_type_onboarding(
+                onboarding_data.most_interested_hobby_types.all()
+            )
+        )
 
         event_suggestions_data.update(self.parse_user_availability(user.id))
 
@@ -924,12 +947,12 @@ class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
         """
         user_availability = Availability.objects.filter(user_id=user_id)
         time_period_mapping = {
-            'early_morning': [5, 6, 7, 8],
-            'morning': [9, 10, 11, 12],
-            'afternoon': [13, 14, 15, 16],
-            'evening': [17, 18, 19, 20],
-            'night': [21, 22, 23, 24],
-            'late_night': [1, 2, 3, 4]
+            "early_morning": [5, 6, 7, 8],
+            "morning": [9, 10, 11, 12],
+            "afternoon": [13, 14, 15, 16],
+            "evening": [17, 18, 19, 20],
+            "night": [21, 22, 23, 24],
+            "late_night": [1, 2, 3, 4],
         }
         availability_data_lst = {}
         for availability in user_availability:
@@ -938,11 +961,16 @@ class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
             for period, hours in time_period_mapping.items():
                 preference_field = f"pref_{day_of_week.lower()}_{period}"
                 if int(hour) in hours:
-                    availability_data_lst[preference_field] = availability_data_lst.get(preference_field, [])
-                    availability_data_lst[preference_field].append(availability.available)
-        
-        
-        availability_data = {key: any(value) for key, value in availability_data_lst.items()}
+                    availability_data_lst[preference_field] = availability_data_lst.get(
+                        preference_field, []
+                    )
+                    availability_data_lst[preference_field].append(
+                        availability.available
+                    )
+
+        availability_data = {
+            key: any(value) for key, value in availability_data_lst.items()
+        }
         return availability_data
 
     def parse_distance_preferences(self, distance):
@@ -956,19 +984,19 @@ class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
         Returns: distance_data (dict): dictionary of user's distance preferences data
         """
         distance_preference_mapping = {
-            'Within 1 mile': 'pref_dist_within_1mi',
-            'Within 5 miles': 'pref_dist_within_5mi',
-            'Within 10 miles': 'pref_dist_within_10mi',
-            'Within 15 miles': 'pref_dist_within_15mi',
-            'Within 20 miles': 'pref_dist_within_20mi',
-            'Within 30 miles': 'pref_dist_within_30mi',
-            'Within 40 miles': 'pref_dist_within_40mi',
-            'Within 50 miles': 'pref_dist_within_50mi'
+            "Within 1 mile": "pref_dist_within_1mi",
+            "Within 5 miles": "pref_dist_within_5mi",
+            "Within 10 miles": "pref_dist_within_10mi",
+            "Within 15 miles": "pref_dist_within_15mi",
+            "Within 20 miles": "pref_dist_within_20mi",
+            "Within 30 miles": "pref_dist_within_30mi",
+            "Within 40 miles": "pref_dist_within_40mi",
+            "Within 50 miles": "pref_dist_within_50mi",
         }
         distance_data = {}
         if distance != "No preference":
             distance_data[distance_preference_mapping[distance]] = True
-        
+
         for pref, field in distance_preference_mapping.items():
             if pref != distance:
                 distance_data[field] = False
@@ -987,19 +1015,19 @@ class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
         """
 
         similarity_mapping = {
-            'Completely dissimilar': 'pref_similarity_to_group_1',
-            'Moderately dissimilar': 'pref_similarity_to_group_2',
-            'Moderately similar': 'pref_similarity_to_group_3',
-            'Completely similar': 'pref_similarity_to_group_4',
+            "Completely dissimilar": "pref_similarity_to_group_1",
+            "Moderately dissimilar": "pref_similarity_to_group_2",
+            "Moderately similar": "pref_similarity_to_group_3",
+            "Completely similar": "pref_similarity_to_group_4",
         }
         similarity_data = {}
         if similarity_value in similarity_mapping:
             similarity_data[similarity_mapping[similarity_value]] = True
-        
+
         for pref, field in similarity_mapping.items():
             if pref != similarity_value:
                 similarity_data[field] = False
-        
+
         return similarity_data
 
     def parse_similarity_metrics(self, metrics):
@@ -1018,7 +1046,7 @@ class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
             "Age range": "pref_age_similar",
             "Sexual Orientation": "pref_sexual_orientation_similar",
             "Religious Affiliation": "pref_religion_similar",
-            "Political Leaning": "pref_political_leaning_similar"
+            "Political Leaning": "pref_political_leaning_similar",
         }
 
         if not metrics:
@@ -1028,18 +1056,18 @@ class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
             parsed_metrics = {}
             for preference, field in similarity_metrics_mapping.items():
                 parsed_metrics[field] = preference in metrics
-            
+
             return parsed_metrics
 
     def num_participant_mapping(self, value):
         """
-        Helper function to standardize participant data into necessary format
-        for EventSugestions Row
+         Helper function to standardize participant data into necessary format
+         for EventSugestions Row
 
-        Inputs:
-            value (str): string of user's preferred number of event participants, if empty returns Null
+         Inputs:
+             value (str): string of user's preferred number of event participants, if empty returns Null
 
-       Return: string: String of the value parsed into the necessary format
+        Return: string: String of the value parsed into the necessary format
         """
 
         if "1-5" in value:
@@ -1074,7 +1102,7 @@ class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
             "FOOD AND DRINK": "pref_hobby_category_food",
             "COOKING/BAKING": "pref_hobby_category_cooking_and_baking",
             "SPORT/EXERCISE": "pref_hobby_category_exercise",
-            "OUTDOORS":  "pref_hobby_category_outdoor_activities",
+            "OUTDOORS": "pref_hobby_category_outdoor_activities",
             "CRAFTING": "pref_hobby_category_crafting",
             "HISTORY AND LEARNING": "pref_hobby_category_history",
             "COMMUNITY EVENTS": "pref_hobby_category_community",
@@ -1103,14 +1131,17 @@ class PanelUserPreferencesViewSet(viewsets.ModelViewSet):
             "1-5": "pref_num_particip_1to5",
             "5-10": "pref_num_particip_5to10",
             "10-15": "pref_num_particip_10to15",
-            "15+": "pref_num_particip_15p"
+            "15+": "pref_num_particip_15p",
         }
         num_participants_data = {}
         for num_participant in num_participants_map:
-            num_participants_data[num_participants_map[num_participant]] = num_participant in num_participants
+            num_participants_data[num_participants_map[num_participant]] = (
+                num_participant in num_participants
+            )
 
-        return(num_participants_data)
-    
+        return num_participants_data
+
+
 class PanelEventViewSet(viewsets.ModelViewSet):
     queryset = PanelEvent.objects.all()
     serializer_class = PanelEventSerializer
@@ -1118,7 +1149,7 @@ class PanelEventViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
-        event_id = self.request.query_params.get('event_id')
+        event_id = self.request.query_params.get("event_id")
 
         if event_id:
             event = Event.objects.filter(id=event_id)
@@ -1129,10 +1160,10 @@ class PanelEventViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         # Ensure the event_id is provided in the request
-        event_id = request.data.get('event_id')
+        event_id = request.data.get("event_id")
         if not event_id:
             return Response({"error": "Event ID not provided"}, status=400)
-        
+
         # try to get the event
         try:
             event = Event.objects.get(id=event_id)
@@ -1144,7 +1175,9 @@ class PanelEventViewSet(viewsets.ModelViewSet):
             paneled_event = self.prepare_panel_events(event_data)
             panel_event = PanelEvent.objects.create(**paneled_event)
         except Exception as e:
-            return Response({"error": f"Failed to create event suggestions: {str(e)}"}, status=400)
+            return Response(
+                {"error": f"Failed to create event suggestions: {str(e)}"}, status=400
+            )
 
         # Return a success response
         return Response({"detail": "Successfully updated"}, status=201)
@@ -1162,16 +1195,16 @@ class PanelEventViewSet(viewsets.ModelViewSet):
 
         if value is None:
             return None
-        
+
         if value <= 5:
             return "1to5"
-        
+
         if value <= 10:
             return "5to10"
-        
+
         if value <= 15:
             return "10to15"
-        
+
         return "15p"
 
     def prepare_panel_events(self, template_event_data):
@@ -1185,7 +1218,7 @@ class PanelEventViewSet(viewsets.ModelViewSet):
         Returns: event_data (dict): A dictionary containing the panelized event
                  data.
         """
-        event = template_event_data['event_id']
+        event = template_event_data["event_id"]
 
         event_data_template = template_event_data.copy()
         event_data = self.parse_event_data(event, event_data_template)
@@ -1203,7 +1236,7 @@ class PanelEventViewSet(viewsets.ModelViewSet):
 
         Returns:
             event_data: Event 1 with preferences and onboarding information
-        """        
+        """
         event_data = data_template.copy()
         event_data.update(self.parse_hobby_type(event.hobby_type))
 
@@ -1236,7 +1269,7 @@ class PanelEventViewSet(viewsets.ModelViewSet):
             "FOOD AND DRINK": "hobby_category_food",
             "COOKING/BAKING": "hobby_category_cooking_and_baking",
             "SPORT/EXERCISE": "hobby_category_exercise",
-            "OUTDOORS":  "hobby_category_outdoor_activities",
+            "OUTDOORS": "hobby_category_outdoor_activities",
             "CRAFTING": "hobby_category_crafting",
             "HISTORY AND LEARNING": "hobby_category_history",
             "COMMUNITY EVENTS": "hobby_category_community",
@@ -1245,7 +1278,7 @@ class PanelEventViewSet(viewsets.ModelViewSet):
 
         for hobby_key in category_mapping.values():
             hobby_data[hobby_key] = False
-        
+
         hobby_data[category_mapping[hobby_type.type]] = True
 
         return hobby_data
@@ -1262,11 +1295,26 @@ class PanelEventViewSet(viewsets.ModelViewSet):
             event_datetime_mapping (dict): dictionary of user's event day and time data
         """
         event_datetime_mapping = {}
-        days_of_week = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-        time_periods = ["early_morning", "morning", "afternoon", "evening", "night", "late_night"]
-        
+        days_of_week = [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+        ]
+        time_periods = [
+            "early_morning",
+            "morning",
+            "afternoon",
+            "evening",
+            "night",
+            "late_night",
+        ]
+
         # convert datetime to day of week and time of day
-        day_of_week = datetime.strftime('%A').lower()
+        day_of_week = datetime.strftime("%A").lower()
         tod_string = self.get_time_of_day(datetime.hour)
         if tod_string is None:
             return event_datetime_mapping
@@ -1285,18 +1333,18 @@ class PanelEventViewSet(viewsets.ModelViewSet):
 
     def get_time_of_day(self, hour):
         time_period_mapping = {
-            'early_morning': [5, 6, 7, 8],
-            'morning': [9, 10, 11, 12],
-            'afternoon': [13, 14, 15, 16],
-            'evening': [17, 18, 19, 20],
-            'night': [21, 22, 23, 24],
-            'late_night': [1, 2, 3, 4]
+            "early_morning": [5, 6, 7, 8],
+            "morning": [9, 10, 11, 12],
+            "afternoon": [13, 14, 15, 16],
+            "evening": [17, 18, 19, 20],
+            "night": [21, 22, 23, 24],
+            "late_night": [1, 2, 3, 4],
         }
 
         for time_period, hours in time_period_mapping.items():
             if hour in hours:
                 return time_period
-        
+
         return None
 
     def parse_duration(self, duration):
@@ -1310,11 +1358,10 @@ class PanelEventViewSet(viewsets.ModelViewSet):
         Returns:
             duration_data (dict): dictionary of user's event duration data
         """
-        duration_data = {
-            f"duration_{i}hr": i == duration for i in range(1, 9)
-        }
+        duration_data = {f"duration_{i}hr": i == duration for i in range(1, 9)}
         return duration_data
-    
+
+
 class PanelScenarioViewSet(viewsets.ModelViewSet):
     queryset = PanelScenario.objects.all()
     serializer_class = PanelScenarioSerializer
@@ -1322,7 +1369,7 @@ class PanelScenarioViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.queryset
-        user_id = self.request.query_params.get('user_id')
+        user_id = self.request.query_params.get("user_id")
 
         if user_id:
             user = User.objects.filter(id=user_id)
@@ -1333,38 +1380,45 @@ class PanelScenarioViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         # Ensure the user_id is provided in the request
-        user_id = request.data.get('user_id')
+        user_id = request.data.get("user_id")
         if not user_id:
             return Response({"error": "User ID not provided"}, status=400)
-        
+
         # get user
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
-        
+
         onboarding_data = {"user_id": user}
 
         # Prepare panel scenario data data based on the user and their onboarding data
         try:
-            paneled_scenarios_lst = self.prepare_user_scenarios(user_id, onboarding_data)
-            panel_scenarios_objs = [PanelScenario(**panel_scenario) for panel_scenario in paneled_scenarios_lst]
+            paneled_scenarios_lst = self.prepare_user_scenarios(
+                user_id, onboarding_data
+            )
+            panel_scenarios_objs = [
+                PanelScenario(**panel_scenario)
+                for panel_scenario in paneled_scenarios_lst
+            ]
             PanelScenario.objects.bulk_create(panel_scenarios_objs)
         except Exception as e:
-            return Response({"error": f"Failed to create event suggestions: {str(e)}"}, status=400)
+            return Response(
+                {"error": f"Failed to create event suggestions: {str(e)}"}, status=400
+            )
 
         # Return a success response
         return Response({"detail": "Successfully updated"}, status=201)
 
     def num_participant_mapping(self, value):
         """
-        Helper function to standardize participant data into necessary format
-        for EventSugestions Row
+         Helper function to standardize participant data into necessary format
+         for EventSugestions Row
 
-        Inputs:
-            value (str): string of user's preferred number of event participants, if empty returns Null
+         Inputs:
+             value (str): string of user's preferred number of event participants, if empty returns Null
 
-       Return: string: String of the value parsed into the necessary format
+        Return: string: String of the value parsed into the necessary format
         """
 
         if "1-5" in value:
@@ -1398,8 +1452,13 @@ class PanelScenarioViewSet(viewsets.ModelViewSet):
         for scenario in user_scenarios:
             # copy the onboarding data into a new dictionary for the separate scenearios
             user_onboarding_data_template = onboarding_data.copy()
-            if scenario.prefers_event1 is not None or scenario.prefers_event2 is not None:
-                scenario_1_data, scenario_2_data = self.parse_scenario_data(scenario, user_onboarding_data_template)
+            if (
+                scenario.prefers_event1 is not None
+                or scenario.prefers_event2 is not None
+            ):
+                scenario_1_data, scenario_2_data = self.parse_scenario_data(
+                    scenario, user_onboarding_data_template
+                )
 
                 scenario_lst.extend([scenario_1_data, scenario_2_data])
 
@@ -1424,25 +1483,45 @@ class PanelScenarioViewSet(viewsets.ModelViewSet):
         user_event_suggestions_scenario_1.update({"scenario_id": scenario})
         user_event_suggestions_scenario_2.update({"scenario_id": scenario})
 
-        user_event_suggestions_scenario_1.update(self.parse_hobby_type(scenario.hobby1.type))
-        user_event_suggestions_scenario_2.update(self.parse_hobby_type(scenario.hobby2.type))
+        user_event_suggestions_scenario_1.update(
+            self.parse_hobby_type(scenario.hobby1.type)
+        )
+        user_event_suggestions_scenario_2.update(
+            self.parse_hobby_type(scenario.hobby2.type)
+        )
 
-        user_event_suggestions_scenario_1.update(self.parse_distance_mapping(scenario.distance1))
-        user_event_suggestions_scenario_2.update(self.parse_distance_mapping(scenario.distance2))
+        user_event_suggestions_scenario_1.update(
+            self.parse_distance_mapping(scenario.distance1)
+        )
+        user_event_suggestions_scenario_2.update(
+            self.parse_distance_mapping(scenario.distance2)
+        )
 
-        num_part_1 = f"num_particip_{self.num_participant_mapping(scenario.num_participants1)}"
-        num_part_2 = f"num_particip_{self.num_participant_mapping(scenario.num_participants2)}"
+        num_part_1 = (
+            f"num_particip_{self.num_participant_mapping(scenario.num_participants1)}"
+        )
+        num_part_2 = (
+            f"num_particip_{self.num_participant_mapping(scenario.num_participants2)}"
+        )
         user_event_suggestions_scenario_1.update({num_part_1: True})
         user_event_suggestions_scenario_2.update({num_part_2: True})
 
-        user_event_suggestions_scenario_1.update(self.parse_scenario_datetime(scenario.day_of_week1, scenario.time_of_day1))
-        user_event_suggestions_scenario_2.update(self.parse_scenario_datetime(scenario.day_of_week2, scenario.time_of_day2))
+        user_event_suggestions_scenario_1.update(
+            self.parse_scenario_datetime(scenario.day_of_week1, scenario.time_of_day1)
+        )
+        user_event_suggestions_scenario_2.update(
+            self.parse_scenario_datetime(scenario.day_of_week2, scenario.time_of_day2)
+        )
 
-        user_event_suggestions_scenario_1.update(self.parse_duration(scenario.duration_h1))
-        user_event_suggestions_scenario_2.update(self.parse_duration(scenario.duration_h2))
+        user_event_suggestions_scenario_1.update(
+            self.parse_duration(scenario.duration_h1)
+        )
+        user_event_suggestions_scenario_2.update(
+            self.parse_duration(scenario.duration_h2)
+        )
 
-        user_event_suggestions_scenario_1['attended_event'] = scenario.prefers_event1
-        user_event_suggestions_scenario_2['attended_event'] = scenario.prefers_event2
+        user_event_suggestions_scenario_1["attended_event"] = scenario.prefers_event1
+        user_event_suggestions_scenario_2["attended_event"] = scenario.prefers_event2
 
         return user_event_suggestions_scenario_1, user_event_suggestions_scenario_2
 
@@ -1466,7 +1545,7 @@ class PanelScenarioViewSet(viewsets.ModelViewSet):
             "FOOD AND DRINK": "hobby_category_food",
             "COOKING/BAKING": "hobby_category_cooking_and_baking",
             "SPORT/EXERCISE": "hobby_category_exercise",
-            "OUTDOORS":  "hobby_category_outdoor_activities",
+            "OUTDOORS": "hobby_category_outdoor_activities",
             "CRAFTING": "hobby_category_crafting",
             "HISTORY AND LEARNING": "hobby_category_history",
             "COMMUNITY EVENTS": "hobby_category_community",
@@ -1475,7 +1554,7 @@ class PanelScenarioViewSet(viewsets.ModelViewSet):
 
         for hobby_key in category_mapping.values():
             hobby_data[hobby_key] = False
-        
+
         hobby_data[category_mapping[hobby_type.type]] = True
 
         return hobby_data
@@ -1494,16 +1573,21 @@ class PanelScenarioViewSet(viewsets.ModelViewSet):
         distance_data = {}
 
         distance_preference_mapping = {
-            'Within 1 mile': 'dist_within_1mi',
-            'Within 5 miles': 'dist_within_5mi',
-            'Within 10 miles': 'dist_within_10mi',
-            'Within 15 miles': 'dist_within_15mi',
-            'Within 20 miles': 'dist_within_20mi',
-            'Within 30 miles': 'dist_within_30mi',
-            'Within 40 miles': 'dist_within_40mi',
-            'Within 50 miles': 'dist_within_50mi'
+            "Within 1 mile": "dist_within_1mi",
+            "Within 5 miles": "dist_within_5mi",
+            "Within 10 miles": "dist_within_10mi",
+            "Within 15 miles": "dist_within_15mi",
+            "Within 20 miles": "dist_within_20mi",
+            "Within 30 miles": "dist_within_30mi",
+            "Within 40 miles": "dist_within_40mi",
+            "Within 50 miles": "dist_within_50mi",
         }
-        distance_data.update({value: (distance == key) for key, value in distance_preference_mapping.items()})
+        distance_data.update(
+            {
+                value: (distance == key)
+                for key, value in distance_preference_mapping.items()
+            }
+        )
 
         return distance_data
 
@@ -1524,8 +1608,23 @@ class PanelScenarioViewSet(viewsets.ModelViewSet):
         tod_string = time_of_day.split("(")[0].strip()
         tod_standardized = "_".join(tod_string.lower().split())
 
-        days_of_week = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-        time_periods = ["early_morning", "morning", "afternoon", "evening", "night", "late_night"]
+        days_of_week = [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+        ]
+        time_periods = [
+            "early_morning",
+            "morning",
+            "afternoon",
+            "evening",
+            "night",
+            "late_night",
+        ]
 
         for day in days_of_week:
             for period in time_periods:
@@ -1548,17 +1647,16 @@ class PanelScenarioViewSet(viewsets.ModelViewSet):
         Returns:
             duration_data (dict): dictionary of user's scenario duration data
         """
-        duration_data = {
-            f"duration_{i}hr": i == duration for i in range(1, 9)
-        }
+        duration_data = {f"duration_{i}hr": i == duration for i in range(1, 9)}
         return duration_data
+
 
 class SuggestionResultsViewSet(viewsets.ModelViewSet):
     serializer_class = SuggestionResultsSerializer
     permission_classes = [HasAppToken]
     queryset = SuggestionResults.objects.all()
 
-    @action(detail=False, methods=['get'], url_path='finetune_model')
+    @action(detail=False, methods=["get"], url_path="finetune_model")
     def finetune_model(self, request):
         """
         Finetunes the ML model.
@@ -1575,12 +1673,15 @@ class SuggestionResultsViewSet(viewsets.ModelViewSet):
         # get finetuning data
         finetuning_data = self.get_finetuning_data()
 
+        if not finetuning_data or len(finetuning_data) == 0:
+            return {"error": "No data provided for finetuning."}
+
         # get pretraining data
         print("Getting pretraining data...")
         pretraining_data = self.collect_training_data()
         if not pretraining_data:
             return {"error": "Failed to fetch pretraining data"}
-        
+
         # pretrain the model
         print("Pretraining the model...")
         epochs_pt, loss_list_pt, acc_list_pt = pretrain(pretraining_data, num_epochs=30)
@@ -1596,9 +1697,9 @@ class SuggestionResultsViewSet(viewsets.ModelViewSet):
             "pretraining_acc_list": acc_list_pt,
             "finetuning_epochs": epochs,
             "finetuning_loss_list": loss_list,
-            "finetuning_acc_list": acc_list
+            "finetuning_acc_list": acc_list,
         }
-    
+
     def get_finetuning_data(self):
         """
         Gets the finetuning data for the ML model.
@@ -1614,10 +1715,10 @@ class SuggestionResultsViewSet(viewsets.ModelViewSet):
         print("Getting the finetuning data...")
         for user_events_dict in user_events_data_serializer.data:
             finetuning_dict = {}
-            user_id = user_events_dict['user_id']
+            user_id = user_events_dict["user_id"]
             user_panel = PanelUserPreferences.objects.filter(user_id=user_id)
 
-            event_id = user_events_dict['event_id']
+            event_id = user_events_dict["event_id"]
             # check if the event has passed and if not, don't add it to finetuning data
             event = Event.objects.get(id=event_id)
             if event.datetime < timezone.now():
@@ -1638,12 +1739,12 @@ class SuggestionResultsViewSet(viewsets.ModelViewSet):
                 distance_bin = self.distance_calc(event_id, user_id)
                 finetuning_dict.update(distance_bin[0])
 
-                finetuning_dict['attended_event'] = user_events_dict['attended']
+                finetuning_dict["attended_event"] = user_events_dict["attended"]
                 finetuning_data.append(finetuning_dict)
 
         return finetuning_data
 
-    @action(detail=False, methods=['get'], url_path='get_training_data')
+    @action(detail=False, methods=["get"], url_path="get_training_data")
     def get_training_data(self, request):
         """
         Returns the training data for the ML model.
@@ -1651,7 +1752,7 @@ class SuggestionResultsViewSet(viewsets.ModelViewSet):
         data = self.collect_training_data()
         if not data:
             return Response({"error": "No data found"}, status=404)
-        
+
         return Response(data, status=200)
 
     def collect_training_data(self):
@@ -1659,12 +1760,14 @@ class SuggestionResultsViewSet(viewsets.ModelViewSet):
         Collects the training data for the ML model.
         """
         scenario_panel_data = PanelScenario.objects.all()
-        scenario_panel_serializer = PanelScenarioSerializer(scenario_panel_data, many=True)
+        scenario_panel_serializer = PanelScenarioSerializer(
+            scenario_panel_data, many=True
+        )
         data = []
 
         # grab the associated user panel data
         for scenario_panel_dict in scenario_panel_serializer.data:
-            user_id = scenario_panel_dict['user_id']
+            user_id = scenario_panel_dict["user_id"]
             user_panel = PanelUserPreferences.objects.filter(user_id=user_id)
             if user_panel.exists():
                 user_panel = user_panel[0]
@@ -1673,30 +1776,30 @@ class SuggestionResultsViewSet(viewsets.ModelViewSet):
 
         return data
 
-    @action(detail=False, methods=['get'], url_path='update')
+    @action(detail=False, methods=["get"], url_path="update")
     def update_suggestions(self, request, *args, **kwargs):
         """
         Update suggestion results for a given user.
 
         If no user_id is provided, return it updates suggestions for all users.
         """
-        user_id = request.query_params.get('user_id')
+        user_id = request.query_params.get("user_id")
         if user_id:
             result = self.perform_update_suggestions(user_id)
             if "error" in result:
                 return Response(result, status=400)
             return Response(result, status=200)
-        
-        user_ids = User.objects.values_list('id', flat=True)
+
+        user_ids = User.objects.values_list("id", flat=True)
         results = []
         for user_id in user_ids:
             result = self.perform_update_suggestions(user_id)
             if "error" in result:
                 return Response(result, status=400)
             results.append(result)
-        
+
         return Response(results, status=200)
-        
+
     def perform_update_suggestions(self, user_id):
         """
         Update suggestion results for a given user.
@@ -1707,116 +1810,131 @@ class SuggestionResultsViewSet(viewsets.ModelViewSet):
             # Retrieve and process user and event data
             user_panel = PanelUserPreferences.objects.get(user_id=user)
             event_panel = PanelEvent.objects.all()
-            
+
         except Exception as e:
             return {"error": f"Failed to find user or event panel data: {str(e)}"}
 
         user_panel_dict = PanelUserPreferencesSerializer(user_panel).data
 
         # convert events to list of dictionaries and constructs the distance portion of the dictionary
-        event_panel_dict_lst = [PanelEventSerializer(event).data for event in event_panel]
-        distance_panel_list = [] # Set up list to hold panel distance data
-        event_ids = [] # Set up list to hold event IDs
+        event_panel_dict_lst = [
+            PanelEventSerializer(event).data for event in event_panel
+        ]
+        distance_panel_list = []  # Set up list to hold panel distance data
+        event_ids = []  # Set up list to hold event IDs
         attendance = []
-        
+
         # get distance and attendance
         for event in event_panel_dict_lst:
             # Construct a distance dictionary for each event-user pair
             distance_panel_list.append(
-                self.distance_calc(event['event_id'], user_id)[0]
+                self.distance_calc(event["event_id"], user_id)[0]
             )
-            user_event = UserEvents.objects.filter(user_id=user_id, event_id=event['event_id'])
+            user_event = UserEvents.objects.filter(
+                user_id=user_id, event_id=event["event_id"]
+            )
             if user_event.exists():
                 attendance.append(user_event[0].attended)
-            
+
         # Combine the three dictionaries to form rows
         model_list = [
-            {**user_panel_dict, **event, **distance_panel} 
+            {**user_panel_dict, **event, **distance_panel}
             for event, distance_panel in zip(event_panel_dict_lst, distance_panel_list)
         ]
 
         # Get recommendations
         prediction_probs = recommend(model_list)
-        event_ids = [event['event_id'] for event in event_panel_dict_lst]
+        event_ids = [event["event_id"] for event in event_panel_dict_lst]
 
         results = []
         for pred, event_id in zip(prediction_probs, event_ids):
             event = Event.objects.get(id=event_id)
             result = SuggestionResults.objects.update_or_create(
-                user_id = user,
-                event_id = event,
-                defaults = {
-                    'probability_of_attendance': pred[0],
-                    'event_date': event.datetime
-                }
+                user_id=user,
+                event_id=event,
+                defaults={
+                    "probability_of_attendance": pred[0],
+                    "event_date": event.datetime,
+                },
             )
             results.append(result[0])
-        
+
         # serialize the results for the response
         serializer = SuggestionResultsSerializer(results, many=True)
         return {"data": serializer.data}
 
-    @action(detail=False, methods=['get'], url_path='get_suggestions')
+    @action(detail=False, methods=["get"], url_path="get_suggestions")
     def trigger_suggestions(self, request):
-        '''
+        """
         Trigger the model to generate suggestions, and return the top 2 event IDs
         that occur in the next two weeks by probability of attendance.
-        '''
-        user_id = request.query_params.get('user_id')
+        """
+        user_id = request.query_params.get("user_id")
         if not user_id:
             return Response({"error": "User ID not provided"}, status=400)
-        
-        
-        # Implementing several filters here: event timing, whether the event is 
+
+        # Implementing several filters here: event timing, whether the event is
         # already full, whether the user is already RSVPed for the event,
         # and whether the user is available for the event.
 
         current_date = timezone.now().date()
         two_weeks_from_now = current_date + timedelta(days=14)
-        
+
         already_rsvp_subquery = UserEvents.objects.filter(
-            user_id_id=OuterRef('user_id'), 
-            event_id_id=OuterRef('event_id')
-        )   
+            user_id_id=OuterRef("user_id"), event_id_id=OuterRef("event_id")
+        )
 
-        attendees_count_subquery = UserEvents.objects.filter(
-            event_id_id=OuterRef('event_id')
-            ).values('event_id_id').annotate(
-                attendees_count=Count('user_id_id')
-            ).values('attendees_count')
+        attendees_count_subquery = (
+            UserEvents.objects.filter(event_id_id=OuterRef("event_id"))
+            .values("event_id_id")
+            .annotate(attendees_count=Count("user_id_id"))
+            .values("attendees_count")
+        )
 
-        top_events = SuggestionResults.objects.filter(
-            user_id = user_id,
-            event_id__datetime__date__range=(current_date, two_weeks_from_now) # Only events in the next two weeks
-            ).annotate(
-                current_attendees=Subquery(attendees_count_subquery)
-            ).filter(
-                ~Q(current_attendees__gte=F('event_id__max_attendees'))
-            ) \
-            .order_by('-probability_of_attendance') \
-            .values('event_id', 'probability_of_attendance', 'user_id')
-        
+        top_events = (
+            SuggestionResults.objects.filter(
+                user_id=user_id,
+                event_id__datetime__date__range=(
+                    current_date,
+                    two_weeks_from_now,
+                ),  # Only events in the next two weeks
+            )
+            .annotate(current_attendees=Subquery(attendees_count_subquery))
+            .filter(~Q(current_attendees__gte=F("event_id__max_attendees")))
+            .order_by("-probability_of_attendance")
+            .values("event_id", "probability_of_attendance", "user_id")
+        )
+        print("Top events: ", top_events)
+
         # filter top events by distance
-        top_events = [event for event in top_events
-                      if self.distance_calc(event['event_id'], user_id)[1] <= 50 #remove events more than 50 miles away
-                      ]
+        top_events = [
+            event
+            for event in top_events
+            if self.distance_calc(event["event_id"], user_id)[1]
+            <= 50  # remove events more than 50 miles away
+        ]
 
-        top_event_data = top_events[:2] # return the top 2 events
+        top_event_data = top_events[:2]  # return the top 2 events
 
         # filter out events the user has already RSVPed for
-        user_rsvps = UserEvents.objects.filter(user_id=user_id).values_list('event_id', flat=True)
-        top_event_data = [event for event in top_event_data if event['event_id'] not in user_rsvps]
-        print(top_event_data)
-
+        user_rsvps = UserEvents.objects.filter(user_id=user_id).values_list(
+            "event_id", flat=True
+        )
+        top_event_data = [
+            event for event in top_event_data if event["event_id"] not in user_rsvps
+        ]
         # add event data
         for event_suggestion in top_event_data:
-            event_id = event_suggestion['event_id']
+            event_id = event_suggestion["event_id"]
             event = Event.objects.get(id=event_id)
 
             event_day_of_week = event.datetime.weekday()
             event_start = event.datetime
             event_end = event.datetime + timedelta(hours=event.duration_h)
-            event_hours = range(event_start.hour, event_end.hour if event_end.minute == 0 else event_end.hour + 1)
+            event_hours = range(
+                event_start.hour,
+                event_end.hour if event_end.minute == 0 else event_end.hour + 1,
+            )
             event_day_of_week = event_start.weekday()
 
             # Query the availability for all the hours during which the event takes place
@@ -1824,73 +1942,76 @@ class SuggestionResultsViewSet(viewsets.ModelViewSet):
                 user_id_id=user_id,
                 day_of_week=event_day_of_week,
                 hour__in=event_hours,
-                available=True
+                available=True,
             ).count()
 
-            #If the user is available for all hours of the event, the user_availability query
+            # If the user is available for all hours of the event, the user_availability query
             # will be the number of hours in the event
 
-            event_suggestion['user_available'] = user_availability == len(event_hours)
-            event_suggestion['event_name'] = event.title
-            event_suggestion['event_description'] = event.description
-            event_suggestion['event_date'] = event.datetime
-            event_suggestion['event_duration'] = event.duration_h
-            event_suggestion['event_max_attendees'] = event.max_attendees
-            event_suggestion['address1'] = event.address1
-            event_suggestion['address2'] = event.address2
-            event_suggestion['city'] = event.city
-            event_suggestion['state'] = event.state
-            event_suggestion['zipcode'] = event.zipcode
-            event_suggestion['price'] = event.price
+            event_suggestion["user_available"] = user_availability == len(event_hours)
+            event_suggestion["event_name"] = event.title
+            event_suggestion["event_description"] = event.description
+            event_suggestion["event_date"] = event.datetime
+            event_suggestion["event_duration"] = event.duration_h
+            event_suggestion["event_max_attendees"] = event.max_attendees
+            event_suggestion["address1"] = event.address1
+            event_suggestion["address2"] = event.address2
+            event_suggestion["city"] = event.city
+            event_suggestion["state"] = event.state
+            event_suggestion["zipcode"] = event.zipcode
+            event_suggestion["price"] = event.price
 
             distance_result, _ = self.distance_calc(event_id, user_id)
-            distance_from_user = next((key for key, value in distance_result.items() if value))
-            
-            distance_from_user = "within " + distance_from_user.split("_")[-1].split("mi")[0] + " miles"
-            event_suggestion['distance_from_user'] = distance_from_user
-        
+            distance_from_user = next(
+                (key for key, value in distance_result.items() if value)
+            )
+
+            distance_from_user = (
+                "within " + distance_from_user.split("_")[-1].split("mi")[0] + " miles"
+            )
+            event_suggestion["distance_from_user"] = distance_from_user
+
         # convert nan probabilities to 0
         for event_suggestion in top_event_data:
-            if pd.isna(event_suggestion['probability_of_attendance']):
-                event_suggestion['probability_of_attendance'] = 0
-        
-        return Response({
-            'top_events': top_event_data
-        })
-    
+            if pd.isna(event_suggestion["probability_of_attendance"]):
+                event_suggestion["probability_of_attendance"] = 0
+
+        return Response({"top_events": top_event_data})
+
     def distance_calc(self, event_id, user_id):
-        '''
+        """
         Calculates and returns a dictionary with distance binaries for
         use in the machine learning setup.
 
         Returns that dictionary and the raw distance value in a tuple.
-        '''
+        """
         event = Event.objects.get(id=event_id)
         onboarding = Onboarding.objects.get(user_id=user_id)
         distance = distance_bin(
             (onboarding.latitude, onboarding.longitude),
-            (event.latitude, event.longitude)
+            (event.latitude, event.longitude),
         )
-        
+
         distance_dict = {
-            'dist_within_1mi': False, 
-            'dist_within_5mi': False, 
-            'dist_within_10mi': False,
-            'dist_within_15mi': False, 
-            'dist_within_20mi': False,
-            'dist_within_30mi': False, 
-            'dist_within_40mi': False, 
-            'dist_within_50mi': False
+            "dist_within_1mi": False,
+            "dist_within_5mi": False,
+            "dist_within_10mi": False,
+            "dist_within_15mi": False,
+            "dist_within_20mi": False,
+            "dist_within_30mi": False,
+            "dist_within_40mi": False,
+            "dist_within_50mi": False,
         }
 
         if distance[0] is not None:
-            for v in [1,5,10,15,20,30,40,50]:
+            for v in [1, 5, 10, 15, 20, 30, 40, 50]:
                 if distance[0] < v:
-                    distance_dict[f'dist_within_{v}mi'] = True
+                    distance_dict[f"dist_within_{v}mi"] = True
                     return (distance_dict, distance[0])
-        
+
         return (distance_dict, None)
-    
+
+
 class SubmitOnboardingViewSet(viewsets.ModelViewSet):
     queryset = Onboarding.objects.all()
     serializer_class = OnbordingSerializer
@@ -1899,18 +2020,18 @@ class SubmitOnboardingViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         """
         Centralized endpoint for submitting onboarding data.
-        
+
         Request data should be a dictionary/JSON object with the following keys:
             - user_data: user data dictionary
             - availability: list of availability dictionaries
             - onboarding: onboarding data dictionary
             - scenarios: list of scenario dictionaries
-            i.e., {"user_data": {"user_id": number}, 
-                   "availability": [{"day_of_week": string, "hour": number, "available": boolean}, ...], 
-                   "onboarding": {"num_participants": string, "distance": string,...}, 
+            i.e., {"user_data": {"user_id": number},
+                   "availability": [{"day_of_week": string, "hour": number, "available": boolean}, ...],
+                   "onboarding": {"num_participants": string, "distance": string,...},
                    "scenarios": [{"day_of_week1": string, "time_of_day1": string,...},...]
                    }
-        
+
         This functional handles the sequential requirements of data updates:
             1. Insert availability data
             2. Insert and panelize scenario data
@@ -1919,116 +2040,127 @@ class SubmitOnboardingViewSet(viewsets.ModelViewSet):
         This function also allows for partial updates to onboarding data.
         """
         # validate request data
-        keys = ['user_data', 'availability', 'onboarding', 'scenarios']
+        keys = ["user_data", "availability", "onboarding", "scenarios"]
         if not all([key in request.data for key in keys]):
             return Response({"error": f"Missing required fields: {keys}"}, status=400)
-        
+
         # get user data
-        user_data = request.data['user_data']
-        user_id = user_data.get('user_id')
+        user_data = request.data["user_data"]
+        user_id = user_data.get("user_id")
         if not user_id:
             return Response({"error": "User ID not provided"}, status=400)
-        
+
         # get user
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
-        
+
         # trigger availability endpoint if data is available
-        if len(request.data.get('availability')) > 0:
+        if len(request.data.get("availability")) > 0:
             availability_response = self.trigger_availability(request, user_id)
             if availability_response.status_code not in [200, 201, 202]:
                 return availability_response
-        
+
         # trigger scenario endpoint if data is available
-        if len(request.data.get('scenarios')) > 0:
+        if len(request.data.get("scenarios")) > 0:
             scenario_response = self.trigger_scenario(request, user_id)
             if scenario_response.status_code not in [200, 201, 202]:
                 return scenario_response
-        
+
         # trigger onboarding endpoint
-        if len(request.data.get('onboarding')) > 0:
+        if len(request.data.get("onboarding")) > 0:
             onboarding_response = self.trigger_onboarding(request, user_id)
             if onboarding_response.status_code not in [200, 201, 202]:
                 return onboarding_response
 
         # Now that availability, onboarding, and scenarios are present,
-        # we can do the user's first inference so they have event suggestions  
-        if len(request.data.get('availability')) > 0 \
-        and len(request.data.get('scenarios')) > 0 \
-        and len(request.data.get('onboarding')) > 0:
+        # we can do the user's first inference so they have event suggestions
+        if (
+            len(request.data.get("availability")) > 0
+            and len(request.data.get("scenarios")) > 0
+            and len(request.data.get("onboarding")) > 0
+        ):
             inference_response = self.trigger_first_inference(user_id)
             if inference_response.status_code not in [200, 201, 202]:
                 return inference_response
-            
+
         return Response({"detail": "Successfully updated"}, status=201)
-        
+
     def trigger_availability(self, request, user_id):
         # get availability data
-        availability = request.data.get('availability')
+        availability = request.data.get("availability")
 
         # send data as a request to the availability endpoint
         if not availability[0].get("user_id"):
-            availability= [{"user_id": user_id}] + availability
+            availability = [{"user_id": user_id}] + availability
 
         # to mimic a request object
         factory = RequestFactory()
-        mimic_request = factory.post('/fake-url/', {"availability": availability}, format='json')
+        mimic_request = factory.post(
+            "/fake-url/", {"availability": availability}, format="json"
+        )
 
         # create event suggestions
         mimic_request.data = availability
         availability = AvailabilityViewSet()
         response = availability.bulk_update(mimic_request)
         return response
-    
+
     def trigger_scenario(self, request, user_id):
         # get scenario data
-        scenarios_data = request.data.get('scenarios')
+        scenarios_data = request.data.get("scenarios")
 
         # clean data
         cleaned_scenario_data = [{"user_id": user_id}] + scenarios_data
         for item in cleaned_scenario_data:
-            item['user_id'] = int(item['user_id'])
-        
+            item["user_id"] = int(item["user_id"])
+
         # to mimic a request object
         factory = RequestFactory()
-        mimic_request = factory.post('/fake-url/', {"scenarios": cleaned_scenario_data}, format='json')
+        mimic_request = factory.post(
+            "/fake-url/", {"scenarios": cleaned_scenario_data}, format="json"
+        )
 
         # create event suggestions
         mimic_request.data = cleaned_scenario_data
         scenario_view = ScenariosiewSet()
         response = scenario_view.bulk_create(mimic_request)
         return response
-    
+
     def trigger_onboarding(self, request, user_id):
         # get onboarding data
-        onboarding_data = request.data.get('onboarding')
+        onboarding_data = request.data.get("onboarding")
 
         # clean the passed data
-        cleaned_data = {key: (value if value is not None else "") for key, value in onboarding_data.items()}
+        cleaned_data = {
+            key: (value if value is not None else "")
+            for key, value in onboarding_data.items()
+        }
         cleaned_data["user_id"] = cleaned_data.get("user_id", user_id)
 
         # to mimic a request object
         factory = APIRequestFactory()
-        mimic_request = factory.post('/fake-url/', {'onboarding': cleaned_data}, format='json')
+        mimic_request = factory.post(
+            "/fake-url/", {"onboarding": cleaned_data}, format="json"
+        )
 
         # create event suggestions
         mimic_request.data = cleaned_data
         onboarding_view = OnboardingViewSet()
         onboarding_view.request = mimic_request
-        onboarding_view.action_map = {'post': 'update_onboarding'}
+        onboarding_view.action_map = {"post": "update_onboarding"}
         onboarding_view.format_kwarg = None
         response = onboarding_view.update_onboarding(mimic_request)
 
         return response
-    
+
     def trigger_first_inference(self, user_id):
         # Run initial round of inference
         factory = APIRequestFactory()
-        suggestion_request = factory.get('/fake-url-suggestions/', {}, format='json')
+        suggestion_request = factory.get("/fake-url-suggestions/", {}, format="json")
         suggestion_request.query_params = QueryDict(mutable=True)
-        suggestion_request.query_params['user_id'] = user_id
+        suggestion_request.query_params["user_id"] = user_id
 
         suggestion_view_set = SuggestionResultsViewSet()
         suggestion_view_set.request = suggestion_request

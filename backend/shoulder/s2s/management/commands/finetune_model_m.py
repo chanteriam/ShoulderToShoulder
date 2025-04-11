@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand
 from s2s.views import SuggestionResultsViewSet
 import datetime
 
+
 class Command(BaseCommand):
     help = "Fine-tunes the ML model."
 
@@ -15,10 +16,11 @@ class Command(BaseCommand):
         if "error" in result:
             self.stderr.write(self.style.ERROR(f"Error: {result['error']}"))
         else:
-            self.stdout.write(self.style.SUCCESS(f"Finetuning completed successfully. Results:"))
+            self.stdout.write(
+                self.style.SUCCESS(f"Finetuning completed successfully. Results:")
+            )
             current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            result_message = \
-            f"""Time: {current_time}
+            result_message = f"""Time: {current_time}
 
             Pre-training:
             Number of pre-training epochs: {result['pretraining_epochs'][-1]}

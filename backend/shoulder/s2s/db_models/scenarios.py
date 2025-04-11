@@ -69,17 +69,17 @@ class Scenarios(models.Model):
     hobby1 = models.ForeignKey(Hobby, on_delete=models.CASCADE, related_name='hobby1')
     hobby2 = models.ForeignKey(Hobby, on_delete=models.CASCADE, related_name='hobby2')
 
-    distance1 = models.CharField(choices=ALLOWED_DISTANCES)
-    distance2 = models.CharField(choices=ALLOWED_DISTANCES)
+    distance1 = models.CharField(choices=ALLOWED_DISTANCES, max_length=15)
+    distance2 = models.CharField(choices=ALLOWED_DISTANCES, max_length=15)
 
-    num_participants1 = models.CharField(choices=ALLOWED_PARTICIPANT_NUM)
-    num_participants2 = models.CharField(choices=ALLOWED_PARTICIPANT_NUM)
+    num_participants1 = models.CharField(choices=ALLOWED_PARTICIPANT_NUM, max_length=15)
+    num_participants2 = models.CharField(choices=ALLOWED_PARTICIPANT_NUM, max_length=15)
 
-    day_of_week1 = models.CharField(choices=ALLOWED_DAYS)
-    day_of_week2 = models.CharField(choices=ALLOWED_DAYS)
+    day_of_week1 = models.CharField(choices=ALLOWED_DAYS, max_length=15)
+    day_of_week2 = models.CharField(choices=ALLOWED_DAYS, max_length=15)
 
-    time_of_day1 = models.CharField(choices=ALLOWED_TOD)
-    time_of_day2 = models.CharField(choices=ALLOWED_TOD)
+    time_of_day1 = models.CharField(choices=ALLOWED_TOD, max_length=20)
+    time_of_day2 = models.CharField(choices=ALLOWED_TOD, max_length=20)
 
     duration_h1 = models.IntegerField(validators=[
             MaxValueValidator(8),
